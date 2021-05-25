@@ -1,0 +1,28 @@
+filegroup(
+    name = "license",
+    srcs = [
+        "LICENSE",
+        "NOTICE",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "grid",
+    actual = "//java/server/src/org/openqa/selenium/grid:executable-grid",
+)
+
+alias(
+    name = "debug-server",
+    actual = "//java/client/test/org/openqa/selenium/environment:appserver",
+)
+
+alias(
+    name = "calcdeps",
+    actual = "//javascript/atoms:deps",
+)
+
+alias(
+    name = "selenium-server-standalone",
+    actual = "//java/server/src/org/openqa/selenium/grid:selenium_server_deploy.jar",
+)

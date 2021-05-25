@@ -1,0 +1,9 @@
+load("//java:defs.bzl", "java_library")
+
+java_library(
+    name = "jmx",
+    srcs = glob(["*.java"]),
+    visibility = [
+        "//java/server/src/org/openqa/selenium/grid/session:__pkg__",
+    ],
+)
