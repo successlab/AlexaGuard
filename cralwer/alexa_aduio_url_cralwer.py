@@ -12,7 +12,7 @@ import json
 import random
 
 username = "zzh4g523710043@gmail.com"
-password = "9m8P42$J:BpYEcX"
+password = ""
 
 dev_consel_url = "https://developer.amazon.com/alexa/console/ask/test/amzn1.ask.skill.e8108ad1-e266-4194-a2a0-2774ea5e3ddd/development/en_US/"
 
