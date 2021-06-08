@@ -4,6 +4,9 @@ import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 # To-do import "Your model"
 
 # if_abusive(skill_output) --> True/False
@@ -14,6 +17,7 @@ class ChatWithAlexa:
         self.url = test_url
         self.usrname = usrname
         self.passwd = passwd
+        self.audio_url = ""
 
 
 
@@ -27,22 +31,53 @@ class ChatWithAlexa:
         self.browser.find_element_by_id("signInSubmit").click()
 
     def skill_chat(self, invocation_name):
+        """
+        We initialize the skill with this
+        """
         start_skill_command = "Alexa, enable " + invocation_name
         time.sleep(1)
         self.browser.find_element_by_css_selector('input.askt-utterance__input').send_keys(start_skill_command)
         time.sleep(1)
         self.browser.find_element_by_css_selector("input.askt-utterance__input").send_keys(Keys.RETURN)
-        time.sleep(15)
+        #time.sleep(15) #<- this wait is too long. we could missed entire response's url
 
-        for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
-        	print(xx.text)
+        #serch for new audio url every 0.5 second
+        #if found new audio url is different then new, reset wait to 15
+        #change this to dynamic?
+
+        i = 0
+        urls = []
+        while i < 30: # check audio_url for 30 times
+            new_audio_url = self.get_audio_url()
+            if self.audio_url != new_audio_url:
+                i = 0
+                urls.append(new_audio_url)
+                self.audio_url = new_audio_url 
+            time.sleep(0.5)
+            i += 1
+
+        self.get_text()
+
+        self.urls = urls
+
+        
+        print("\n\n\n")
+        print(self.new)
+        print("\n\n\n")
+        print(self.urls)
+        print("\n\n\n")
+        print(self.get_newest_text())
+
+        #for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
+        #    print(xx.text)
+        #    print(xx.get_attribute("class"))
 
     def conversational_engine(self, skill_output):
         """
         what and how to respond
         """
-        if if_question(skill_output):
-            return
+        #if if_question(skill_output):
+        #    return
 
     def chat_input(self, input_to_skill):
         """
@@ -54,8 +89,9 @@ class ChatWithAlexa:
         self.browser.find_element_by_css_selector("input.askt-utterance__input").send_keys(Keys.RETURN)
         time.sleep(15)
 
-        for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
-        	print(xx.text)
+        #for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
+        #    print(xx.text)
+        #    print(xx.get_attribute("class"))
 
     def if_qeustion(self, skill_output):
         """
@@ -67,14 +103,101 @@ class ChatWithAlexa:
     def get_audio_url(self):
         """
         if this skill is use recorded url, get it from the test portal
+
+        we call this skill as a one line
         """
 
-        return ""
+        audio_url = self.browser.find_element_by_id('asf-player-Dialog').get_attribute('src')
 
-urlin = 'https://developer.amazon.com/alexa/console/ask/test/amzn1.ask.skill.e3ba10bf-381e-4efe-b30f-58ca79d41737/development/en_US/'
-username = 'yangyong@tamu.edu'
-password = ''
+        return audio_url
+
+    def get_text(self):
+        
+        new_temp = []
+        
+        for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
+
+            print(xx.get_attribute("class"))
+            print(xx.get_attribute("class").split(" "))
+            xx_attribute = xx.get_attribute("class").split(" ")[1]
+
+            if xx_attribute == "askt-dialog__message--request":
+                xx_attribute = 'request'
+                new_temp.append([xx.text,xx_attribute])
+            elif xx_attribute == "askt-dialog__message--active-response":
+                xx_attribute = 'response'
+                new_temp.append([xx.text,xx_attribute])
+            #else:
+            #    raise "askt-dialog__message have unexpected attribute"
+            # NOTE: the last played msg have different class
+            # NOTE: skip it
+            
+            #new_temp.append([xx.text,xx_attribute])
+
+        #recall that xx.get_attribute("class") will return a string that can seperate by space
+        #askt-dialog__message--request and askt-dialog__bubble--response
+
+        self.new = new_temp
+
+        # ok i doubt this will become too long(unless we keep using the same window without closing it.)
+        # so optimization can wait a little bit
+        # we automatically assume the last "request" is the last commend we uttered
+        # and then the rest are response
+        
+    def get_newest_text(self):
+
+        last_request_idx = 0
+        for i in reversed(range(len(self.new))):
+            if self.new[i][1] == 'request':
+                last_request_idx = i
+                break
+        
+        newest = []
+
+        for xx in self.new[last_request_idx:]:
+            newest.append(xx)
+
+        return newest
+
+        # what if newest is alexa quit or alexa stop?
+        # need code for filtering that
+
+
+    def analysis_audio_rul(self):
+
+        return ""
+        #To-do: tiny url? cloud front? 
+        #To-do: audio to text
+        #To-do: ...
+
+    def quit(self):
+
+        quit_text = "alexa quit"
+        
+        self.browser.find_element_by_css_selector('input.askt-utterance__input').send_keys(quit_text)
+        time.sleep(1)
+        self.browser.find_element_by_css_selector("input.askt-utterance__input").send_keys(Keys.RETURN)
+
+        # checking for situation where skill stuck in a loop because simulation is weird
+        # (plenty of skill will stuck in a loop in simulation while working properly in normal alexa)
+
+        # if stuck
+        newest_text = self.get_newest_text()
+        if len(newest_text) != 1: # <- the latest actually have response 
+            self.browser.close()
+            self.start_browser()
+    
+
+
+username = 'zzh4g523710043@gmail.com'
+password = '9m8P42$J:BpYEcX'
+urlin = 'https://developer.amazon.com/alexa/console/ask/test/amzn1.ask.skill.e8108ad1-e266-4194-a2a0-2774ea5e3ddd/development/en_US/'
 
 xchat = ChatWithAlexa(urlin, username, password)
 xchat.start_browser()
 xchat.skill_chat("lab rule")
+xchat.browser.close()
+
+
+#restart browser for every new skill tested? highly in efficient
+#
