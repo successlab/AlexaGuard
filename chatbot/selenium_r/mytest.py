@@ -7,6 +7,12 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+import speech_recognition as sr
+import requests
+from pydub import AudioSegment
+
+#pip3 install SpeechRecognition pydub
+
 # To-do import "Your model"
 
 # if_abusive(skill_output) --> True/False
@@ -162,8 +168,28 @@ class ChatWithAlexa:
         # what if newest is alexa quit or alexa stop?
         # need code for filtering that
 
+    def transcribe_audio_url(self,audio_url):
+        #download ffmpeg
+        #add ffmpeg to environment var
+        req = requests.get(audio_url, allow_redirects=True)
 
-    def analysis_audio_rul(self):
+        open('audio.mp3', 'wb').write(req.content)
+
+        sound = AudioSegment.from_mp3("audio.mp3")
+        sound.export("audio.wav", format="wav")
+
+        #r.content
+        with sr.AudioFile('audio.wav') as source:
+            r = sr.Recognizer()
+            audio_data = r.record(source)
+            # recognize (convert from speech to text)
+            text = r.recognize_google(audio_data)
+            return text
+
+
+    def analysis_audio_url(self,audio_url):
+
+        
 
         return ""
         #To-do: tiny url? cloud front? 
