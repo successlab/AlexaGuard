@@ -11,6 +11,9 @@ import speech_recognition as sr
 import requests
 from pydub import AudioSegment
 
+from determine_question_type import *
+from generate_answer import *
+
 #pip3 install SpeechRecognition pydub
 
 # To-do import "Your model"
@@ -19,12 +22,12 @@ from pydub import AudioSegment
 # if sexual(skill_output) --> True/False
 
 class ChatWithAlexa:
-    def __init__(self, test_url, usrname, passwd):
+    def __init__(self, test_url, usrname, passwd, parser):
         self.url = test_url
         self.usrname = usrname
         self.passwd = passwd
         self.audio_url = ""
-
+        self.parser = parser #CoreNLPParser()
 
 
     def start_browser(self):
@@ -53,7 +56,7 @@ class ChatWithAlexa:
 
         i = 0
         urls = []
-        while i < 30: # check audio_url for 30 times
+        while i < 30: # check audio_url for 30 times in 15 second
             new_audio_url = self.get_audio_url()
             if self.audio_url != new_audio_url:
                 i = 0
@@ -66,13 +69,19 @@ class ChatWithAlexa:
 
         self.urls = urls
 
-        
         print("\n\n\n")
         print(self.new)
         print("\n\n\n")
         print(self.urls)
         print("\n\n\n")
         print(self.get_newest_text())
+
+        reply = self.conversational_engine(self.get_newest_text()[-1][0])
+        self.browser.find_element_by_css_selector('input.askt-utterance__input').send_keys(reply)
+        time.sleep(1)
+        self.browser.find_element_by_css_selector("input.askt-utterance__input").send_keys(Keys.RETURN)
+
+        time.sleep(10)
 
         #for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
         #    print(xx.text)
@@ -82,8 +91,29 @@ class ChatWithAlexa:
         """
         what and how to respond
         """
-        #if if_question(skill_output):
-        #    return
+        #if self.if_qeustion(skill_output):
+        q_t = determine_qeustion_type(skill_output,self.parser)
+        if q_t == 'selection_CC':
+            return (answer_selection_CC(skill_output,self.parser))
+        elif q_t == 'selection_SC':
+            return (answer_selection_SC(skill_output))
+        elif q_t == 'Y/N':
+            return (answer_YN_question())
+        elif q_t == 'instruction':
+            return (answer_instruction_question(skill_output))
+        elif q_t == 'WH':
+            #print("WH still in working process")
+            import asyncio
+            from api_helper import async_chat
+            return (asyncio.run(async_chat(skill_output)))
+        else:
+            #print("wait man what happened? q_t = ",q_t)
+            import asyncio
+            from api_helper import async_chat
+            return (asyncio.run(async_chat(skill_output)))
+        #https://www.usenix.org/system/files/sec20-guo.pdf
+
+
 
     def chat_input(self, input_to_skill):
         """
@@ -103,7 +133,7 @@ class ChatWithAlexa:
         """
         decide if this is a uqestion, and decide what to answer
         """
-        res = False
+        res = True
         return res
 
     def get_audio_url(self):
@@ -123,8 +153,8 @@ class ChatWithAlexa:
         
         for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
 
-            print(xx.get_attribute("class"))
-            print(xx.get_attribute("class").split(" "))
+            #print(xx.get_attribute("class"))
+            #print(xx.get_attribute("class").split(" "))
             xx_attribute = xx.get_attribute("class").split(" ")[1]
 
             if xx_attribute == "askt-dialog__message--request":
@@ -167,6 +197,17 @@ class ChatWithAlexa:
 
         # what if newest is alexa quit or alexa stop?
         # need code for filtering that
+    
+    def get_newest_response(self):
+        raise "not implemented"
+        return None
+
+    def classify_question(self):
+        #get newest
+        newest_response = self.get_newest_response()
+        raise "not implemented"
+        return None
+        
 
     def transcribe_audio_url(self,audio_url):
         #download ffmpeg
@@ -189,11 +230,8 @@ class ChatWithAlexa:
 
     def analysis_audio_url(self,audio_url):
 
-        
-
         return ""
         #To-do: tiny url? cloud front? 
-        #To-do: audio to text
         #To-do: ...
 
     def quit(self):
@@ -214,16 +252,18 @@ class ChatWithAlexa:
             self.start_browser()
     
 
-
 username = 'zzh4g523710043@gmail.com'
 password = '9m8P42$J:BpYEcX'
 urlin = 'https://developer.amazon.com/alexa/console/ask/test/amzn1.ask.skill.e8108ad1-e266-4194-a2a0-2774ea5e3ddd/development/en_US/'
 
-xchat = ChatWithAlexa(urlin, username, password)
-xchat.start_browser()
-xchat.skill_chat("lab rule")
-xchat.browser.close()
+
+with CoreNLPServer(*jars):
+    parser = CoreNLPParser()
+    xchat = ChatWithAlexa(urlin, username, password,parser)
+    xchat.start_browser()
+    xchat.skill_chat("lab rule")
+    xchat.browser.close()
 
 
-#restart browser for every new skill tested? highly in efficient
+#restart browser for every new skill tested? highly in-efficient
 #
