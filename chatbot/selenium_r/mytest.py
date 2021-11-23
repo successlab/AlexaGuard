@@ -14,6 +14,11 @@ from pydub import AudioSegment
 from determine_question_type import *
 from generate_answer import *
 
+import asyncio
+from api_helper import async_chat
+
+import json
+
 #pip3 install SpeechRecognition pydub
 
 # To-do import "Your model"
@@ -28,6 +33,8 @@ class ChatWithAlexa:
         self.passwd = passwd
         self.audio_url = ""
         self.parser = parser #CoreNLPParser()
+        with open('profiles.json') as profiles_file:
+            self.profiles = json.load(profiles_file)
 
 
     def start_browser(self):
@@ -39,21 +46,26 @@ class ChatWithAlexa:
         time.sleep(1)
         self.browser.find_element_by_id("signInSubmit").click()
 
-    def skill_chat(self, invocation_name):
+    def sent_request(self, request):
+        time.sleep(1)
+        self.browser.find_element_by_css_selector('input.askt-utterance__input').send_keys(request)
+        time.sleep(1)
+        self.browser.find_element_by_css_selector("input.askt-utterance__input").send_keys(Keys.RETURN)
+        time.sleep(10)
+
+    def skill_chat(self, invocation):
         """
         We initialize the skill with this
         """
-        start_skill_command = "Alexa, enable " + invocation_name
-        time.sleep(1)
-        self.browser.find_element_by_css_selector('input.askt-utterance__input').send_keys(start_skill_command)
-        time.sleep(1)
-        self.browser.find_element_by_css_selector("input.askt-utterance__input").send_keys(Keys.RETURN)
+        self.sent_request(invocation)
         #time.sleep(15) #<- this wait is too long. we could missed entire response's url
 
         #serch for new audio url every 0.5 second
         #if found new audio url is different then new, reset wait to 15
         #change this to dynamic?
 
+        #legacy code saved for future usage.
+        """
         i = 0
         urls = []
         while i < 30: # check audio_url for 30 times in 15 second
@@ -75,13 +87,14 @@ class ChatWithAlexa:
         print(self.urls)
         print("\n\n\n")
         print(self.get_newest_text())
+        
+        self.urls = urls
+        """
+        for i in range(4):
+            self.get_text()
+            reply = self.conversational_engine(self.get_newest_response())
+            self.sent_request(reply)
 
-        reply = self.conversational_engine(self.get_newest_text()[-1][0])
-        self.browser.find_element_by_css_selector('input.askt-utterance__input').send_keys(reply)
-        time.sleep(1)
-        self.browser.find_element_by_css_selector("input.askt-utterance__input").send_keys(Keys.RETURN)
-
-        time.sleep(10)
 
         #for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
         #    print(xx.text)
@@ -102,14 +115,9 @@ class ChatWithAlexa:
         elif q_t == 'instruction':
             return (answer_instruction_question(skill_output))
         elif q_t == 'WH':
-            #print("WH still in working process")
-            import asyncio
-            from api_helper import async_chat
-            return (asyncio.run(async_chat(skill_output)))
+            return (answer_WH(skill_output,self.profiles[0]))
         else:
             #print("wait man what happened? q_t = ",q_t)
-            import asyncio
-            from api_helper import async_chat
             return (asyncio.run(async_chat(skill_output)))
         #https://www.usenix.org/system/files/sec20-guo.pdf
 
@@ -129,13 +137,6 @@ class ChatWithAlexa:
         #    print(xx.text)
         #    print(xx.get_attribute("class"))
 
-    def if_qeustion(self, skill_output):
-        """
-        decide if this is a uqestion, and decide what to answer
-        """
-        res = True
-        return res
-
     def get_audio_url(self):
         """
         if this skill is use recorded url, get it from the test portal
@@ -149,7 +150,7 @@ class ChatWithAlexa:
 
     def get_text(self):
         
-        new_temp = []
+        text = []
         
         for xx in self.browser.find_elements_by_css_selector("p.askt-dialog__message"):
 
@@ -159,54 +160,46 @@ class ChatWithAlexa:
 
             if xx_attribute == "askt-dialog__message--request":
                 xx_attribute = 'request'
-                new_temp.append([xx.text,xx_attribute])
-            elif xx_attribute == "askt-dialog__message--active-response":
+                text.append([xx.text,xx_attribute])
+            elif xx_attribute == "askt-dialog__message--active-response" or xx_attribute == "askt-dialog__message--response" :
                 xx_attribute = 'response'
-                new_temp.append([xx.text,xx_attribute])
+                text.append([xx.text,xx_attribute])
             #else:
             #    raise "askt-dialog__message have unexpected attribute"
             # NOTE: the last played msg have different class
-            # NOTE: skip it
+            # NOTE: therefore we need to look for both(last one is at last anyway)
             
             #new_temp.append([xx.text,xx_attribute])
 
         #recall that xx.get_attribute("class") will return a string that can seperate by space
         #askt-dialog__message--request and askt-dialog__bubble--response
 
-        self.new = new_temp
+        self.text = text
 
         # ok i doubt this will become too long(unless we keep using the same window without closing it.)
         # so optimization can wait a little bit
         # we automatically assume the last "request" is the last commend we uttered
         # and then the rest are response
         
-    def get_newest_text(self):
-
-        last_request_idx = 0
-        for i in reversed(range(len(self.new))):
-            if self.new[i][1] == 'request':
-                last_request_idx = i
-                break
-        
-        newest = []
-
-        for xx in self.new[last_request_idx:]:
-            newest.append(xx)
-
-        return newest
-
-        # what if newest is alexa quit or alexa stop?
-        # need code for filtering that
+    def get_newest_request(self):
+        #this function assume that self.get_text() is already runned
+        for t in self.text[::-1]:
+            if t[1] == 'request':
+                return t[0]
+            else:
+                continue
+        print(self.text)
+        raise "no request found"
     
     def get_newest_response(self):
-        raise "not implemented"
-        return None
-
-    def classify_question(self):
-        #get newest
-        newest_response = self.get_newest_response()
-        raise "not implemented"
-        return None
+        #this function assume that self.get_text() is already runned
+        for t in self.text[::-1]:
+            if t[1] == 'response':
+                return t[0]
+            else:
+                continue
+        print(self.text)
+        raise "no response found"
         
 
     def transcribe_audio_url(self,audio_url):
@@ -251,19 +244,20 @@ class ChatWithAlexa:
             self.browser.close()
             self.start_browser()
     
-
-username = 'zzh4g523710043@gmail.com'
-password = '9m8P42$J:BpYEcX'
+with open("credential.json") as credential_file:
+    credential = json.load(credential_file)
+    username = credential['email']
+    password = credential['password']
 urlin = 'https://developer.amazon.com/alexa/console/ask/test/amzn1.ask.skill.e8108ad1-e266-4194-a2a0-2774ea5e3ddd/development/en_US/'
 
 
 with CoreNLPServer(*jars):
     parser = CoreNLPParser()
-    xchat = ChatWithAlexa(urlin, username, password,parser)
+    xchat = ChatWithAlexa(urlin, username, password, parser)
     xchat.start_browser()
-    xchat.skill_chat("lab rule")
+    xchat.skill_chat("Alexa, enable lab rule")
+    print(xchat.get_text())
     xchat.browser.close()
-
 
 #restart browser for every new skill tested? highly in-efficient
 #

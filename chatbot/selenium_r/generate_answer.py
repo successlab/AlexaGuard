@@ -99,6 +99,47 @@ def answer_selection_CC(question,parser):
     parrell_structures_list.remove(CC_word)
     return random.choice(' '.join(parrell_structures_list).split(','))
 
+def answer_WH(question, info):
+    keywords = ['name','address','age','gender','social security number',
+    'SSN', 'state','card','number','phone number','zip','city', 'birthday','bday','birth day','email', 'how old',
+    'credit card']
+    question = re.sub(r'[^\w\s]', '', question.lower())
+    wh_word = ['who', 'what', 'when', 'where', 'why', 'which', 'how']
+    #assume it 100% contain a wh world
+    wh_idx = None
+    for i in range(len(wh_word)):
+        if wh_word[i] in question:
+            wh_idx = i
+            break
+    instruct_un_trim = re.search(rf"(?<={wh_word[wh_idx]}).*",question).group()
+    question = wh_word[wh_idx] + instruct_un_trim
+    kw_idx = None
+    if any([keyword in question for keyword in keywords]):
+        for i in range(len(keywords)):
+            if keywords[i] in question:
+                kw_idx = i
+                break
+    if kw_idx != None:
+        if keywords[kw_idx] in info:
+            return info[keywords[kw_idx]]
+        else:
+            if keywords[kw_idx] == 'credit card':
+                return info['card']
+            elif keywords[kw_idx] == 'number' or keywords[kw_idx] == 'phone number':
+                return info['phone']
+            elif keywords[kw_idx] == 'how old':
+                return info['age']
+            elif keywords[kw_idx] == 'social security number':
+                return info['SSN']
+            elif keywords[kw_idx] == 'state' or keywords[kw_idx] == 'city' or keywords[kw_idx] == 'zip':
+                return info['address']
+            elif keywords[kw_idx] == 'birthyday' or keywords[kw_idx] == 'birth day':
+                return info['bday']
+            
+    else:
+        return None
+
+
 #code for testing
 STANFORD = "models"
 jars = (
